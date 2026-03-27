@@ -1,0 +1,88 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+USE_PROCD=1
+
+PROG_CLIENT="/usr/bin/phantun_client"
+PROG_SERVER="/usr/bin/phantun_server"
+
+. /lib/functions.sh
+. /lib/functions/procd.sh
+
+append_arg_if_set() {
+	local val="$1"
+	local arg="$2"
+	[ -n "$val" ] && procd_append_param command "$arg" "$val"
+}
+
+start_instance() {
+	local section="$1"
+	local enabled role local_addr remote_addr tun tun_local tun_peer
+	local tun_local6 tun_peer6 handshake_packet log_level ipv4_only respawn
+
+	config_get_bool enabled "$section" enabled 0
+	[ "$enabled" -eq 1 ] || return 0
+
+	config_get role "$section" role
+	config_get local_addr "$section" local
+	config_get remote_addr "$section" remote
+	config_get tun "$section" tun
+	config_get tun_local "$section" tun_local
+	config_get tun_peer "$section" tun_peer
+	config_get tun_local6 "$section" tun_local6
+	config_get tun_peer6 "$section" tun_peer6
+	config_get handshake_packet "$section" handshake_packet
+	config_get log_level "$section" log_level "info"
+	config_get_bool ipv4_only "$section" ipv4_only 0
+	config_get_bool respawn "$section" respawn 1
+
+	case "$role" in
+	client)
+		[ -x "$PROG_CLIENT" ] || return 1
+		[ -n "$local_addr" ] || return 1
+		[ -n "$remote_addr" ] || return 1
+		procd_open_instance "$section"
+		procd_set_param env "RUST_LOG=$log_level"
+		procd_set_param command "$PROG_CLIENT" --local "$local_addr" --remote "$remote_addr"
+		;;
+	server)
+		[ -x "$PROG_SERVER" ] || return 1
+		[ -n "$local_addr" ] || return 1
+		[ -n "$remote_addr" ] || return 1
+		procd_open_instance "$section"
+		procd_set_param env "RUST_LOG=$log_level"
+		procd_set_param command "$PROG_SERVER" --local "$local_addr" --remote "$remote_addr"
+		;;
+	*)
+		logger -t phantun "invalid role '$role' in section '$section'"
+		return 1
+		;;
+	esac
+
+	append_arg_if_set "$tun" --tun
+	append_arg_if_set "$tun_local" --tun-local
+	append_arg_if_set "$tun_peer" --tun-peer
+
+	if [ "$ipv4_only" -eq 1 ]; then
+		procd_append_param command --ipv4-only
+	else
+		append_arg_if_set "$tun_local6" --tun-local6
+		append_arg_if_set "$tun_peer6" --tun-peer6
+	fi
+
+	append_arg_if_set "$handshake_packet" --handshake-packet
+
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	[ "$respawn" -eq 1 ] && procd_set_param respawn
+	procd_close_instance
+}
+
+start_service() {
+	config_load phantun
+	config_foreach start_instance instance
+}
+
+stop_service() {
+	return 0
+}

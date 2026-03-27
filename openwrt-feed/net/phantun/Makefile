@@ -15,6 +15,7 @@ PKG_LICENSE:=MIT Apache-2.0
 PKG_LICENSE_FILES:=LICENSE-MIT LICENSE-APACHE
 PKG_BUILD_DEPENDS:=rust/host
 PKG_BUILD_PARALLEL:=1
+MAKE_PATH:=phantun
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -45,8 +46,8 @@ endef
 
 define Package/phantun/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/bin/phantun_client $(1)/usr/bin/
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/bin/phantun_server $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/bin/client $(1)/usr/bin/phantun_client
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/bin/server $(1)/usr/bin/phantun_server
 
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) $(CURDIR)/files/phantun.config $(1)/etc/config/phantun
